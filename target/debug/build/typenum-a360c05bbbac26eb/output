@@ -1,0 +1,2 @@
+cargo:rustc-env=TYPENUM_BUILD_CONSTS=/Users/trietnguyen/Documents/Work/near.fm/Contract_Near.fm/contract/target/debug/build/typenum-a360c05bbbac26eb/out/consts.rs
+cargo:rustc-env=TYPENUM_BUILD_OP=/Users/trietnguyen/Documents/Work/near.fm/Contract_Near.fm/contract/target/debug/build/typenum-a360c05bbbac26eb/out/op.rs
