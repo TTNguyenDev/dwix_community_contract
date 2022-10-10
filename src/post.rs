@@ -7,10 +7,11 @@ pub type TokenId = String;
 #[serde(crate = "near_sdk::serde")]
 #[serde(tag = "type")]
 pub enum PostType {
-    Standard,
-    Image { url: String },
-    Video { url: String },
-    RawbotNFT { token_id: TokenId },
+    // Standard,
+    // Image { url: String },
+    // Video { url: String },
+    // RawbotNFT { token_id: TokenId },
+    Website { url: String, site_id: String }
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
@@ -75,13 +76,14 @@ impl Contract {
         );
 
         match post_type.clone() {
-            PostType::Image { url } => assert!(valid_url(url), "Not valid url"),
-            PostType::Video { url } => assert!(valid_url(url), "Not valid url"),
-            PostType::RawbotNFT { token_id } => match token_id.parse::<u64>() {
-                Err(e) => panic!("{}", e),
-                _ => {}
-            },
-            _ => {}
+            // PostType::Image { url } => assert!(valid_url(url), "Not valid url"),
+            // PostType::Video { url } => assert!(valid_url(url), "Not valid url"),
+            // PostType::RawbotNFT { token_id } => match token_id.parse::<u64>() {
+            //     Err(e) => panic!("{}", e),
+            //     _ => {}
+            // },
+            // _ => {}
+            PostType::Website { url, site_id } => assert!(valid_url(url), "Not valid url")
         };
 
         let account_id = env::predecessor_account_id();
