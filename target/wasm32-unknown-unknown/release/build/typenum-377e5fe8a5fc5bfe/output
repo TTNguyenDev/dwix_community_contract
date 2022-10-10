@@ -1,2 +1,0 @@
-cargo:rustc-env=TYPENUM_BUILD_CONSTS=/Users/trietnguyen/Documents/Work/near.fm/Contract_Near.fm/contract/target/wasm32-unknown-unknown/release/build/typenum-377e5fe8a5fc5bfe/out/consts.rs
-cargo:rustc-env=TYPENUM_BUILD_OP=/Users/trietnguyen/Documents/Work/near.fm/Contract_Near.fm/contract/target/wasm32-unknown-unknown/release/build/typenum-377e5fe8a5fc5bfe/out/op.rs

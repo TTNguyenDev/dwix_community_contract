@@ -1,2 +1,0 @@
-cargo:rustc-env=TYPENUM_BUILD_CONSTS=/Users/trietnguyen/Documents/Work/neil_projects/dwix/dwix_community_contract/target/debug/build/typenum-006ea1b6db8bb685/out/consts.rs
-cargo:rustc-env=TYPENUM_BUILD_OP=/Users/trietnguyen/Documents/Work/neil_projects/dwix/dwix_community_contract/target/debug/build/typenum-006ea1b6db8bb685/out/op.rs
