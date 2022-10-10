@@ -41,7 +41,7 @@ impl StorageManager for Contract {
         let amount = env::attached_deposit();
         let account_id = account_id
             .map(|a| a.into())
-            .unwrap_or_else(|| env::predecessor_account_id());
+            .unwrap_or_else(env::predecessor_account_id);
         if let Some(mut storage_account) = self.storage_accounts.get(&account_id) {
             storage_account.balance += amount;
             self.storage_accounts.insert(&account_id, &storage_account);
@@ -115,6 +115,13 @@ impl StorageAccount {
             Balance::from(self.used_bytes) * STORAGE_PRICE_PER_BYTE <= self.balance,
             "Not enough storage balance to cover changes"
         );
+    }
+}
+
+#[near_bindgen]
+impl Contract {
+    pub fn is_registered(&self, account_id: AccountId) -> bool {
+        self.storage_accounts.get(&account_id).is_some()
     }
 }
 

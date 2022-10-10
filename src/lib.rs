@@ -1,7 +1,7 @@
 use std::str;
 
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::collections::{LookupMap, UnorderedMap, UnorderedSet, Vector, LookupSet};
+use near_sdk::collections::{LookupMap, LookupSet, UnorderedMap, UnorderedSet, Vector};
 use near_sdk::json_types::{ValidAccountId, U64};
 use near_sdk::serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
@@ -12,8 +12,11 @@ use near_sdk::{
 };
 
 pub use crate::account::*;
+pub use crate::admin::*;
+pub use crate::chest::*;
 pub use crate::comment::*;
 pub use crate::community::*;
+pub use crate::ext_nft::*;
 pub use crate::internal_account::*;
 pub use crate::like::*;
 pub use crate::post::*;
@@ -21,17 +24,21 @@ pub use crate::private_message::*;
 pub use crate::storage::*;
 pub use crate::topic::*;
 pub use crate::utils::*;
-pub use crate::admin::*;
 
 /// CONSTANTS
 pub use crate::constant::*;
 
 type PostId = String;
+type PlaceId = String;
+type ChestId = String;
 
 mod account;
+mod admin;
+mod chest;
 mod comment;
 mod community;
 mod constant;
+mod ext_nft;
 mod internal_account;
 mod like;
 mod post;
@@ -39,16 +46,18 @@ mod private_message;
 mod storage;
 mod topic;
 mod utils;
-mod admin;
 
 setup_alloc!();
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Contract {
+    pub ft_contract: AccountId,
+
     pub storage_accounts: LookupMap<AccountId, StorageAccount>,
     pub accounts: UnorderedMap<AccountId, VAccount>,
 
+    // Post
     pub posts: UnorderedMap<PostId, VPost>,
     pub user_posts: LookupMap<AccountId, UnorderedSet<PostId>>,
     pub deleted_posts: UnorderedSet<PostId>,
@@ -56,16 +65,24 @@ pub struct Contract {
     pub messages: LookupMap<MessageId, PrivateMessage>,
     pub likes: UnorderedMap<PostId, UnorderedMap<AccountId, u8>>, //get for Hot page
     pub comments: LookupMap<PostId, Vector<Comment>>, //Should use hashmap to store comment
+    pub check_repost: LookupMap<PostId, UnorderedSet<AccountId>>,
 
+    // Topic
     pub topics: UnorderedMap<TopicId, Topic>,
     pub topics_posts: LookupMap<TopicId, UnorderedSet<PostId>>,
 
+    // Community
     pub communities: UnorderedMap<CommunityId, Community>,
     pub communities_posts: UnorderedMap<CommunityId, UnorderedMap<PostId, VPost>>,
 
     pub members_in_communites: UnorderedMap<CommunityId, UnorderedSet<AccountId>>,
     pub storage_account_in_bytes: StorageUsage,
     pub admins: LookupSet<AccountId>,
+
+    // Chest Item
+    pub place_ids: UnorderedSet<PlaceId>,
+    pub chests_per_place: LookupMap<PlaceId, UnorderedSet<ChestId>>,
+    pub chests: LookupMap<ChestId, Chest>,
 }
 
 impl Default for Contract {
@@ -77,9 +94,11 @@ impl Default for Contract {
 #[near_bindgen]
 impl Contract {
     #[init]
-    pub fn new() -> Self {
+    pub fn new(ft_contract: AccountId) -> Self {
         assert!(!env::state_exists(), "Already initialized");
         let mut this = Self {
+            ft_contract,
+
             storage_accounts: LookupMap::new(StorageKey::StorageAccount),
             accounts: UnorderedMap::new(StorageKey::Accounts),
 
@@ -90,6 +109,8 @@ impl Contract {
             messages: LookupMap::new(StorageKey::Messages),
             likes: UnorderedMap::new(StorageKey::Likes),
             comments: LookupMap::new(StorageKey::Commnets),
+            check_repost: LookupMap::new(StorageKey::CheckRePost),
+            
 
             topics: UnorderedMap::new(StorageKey::Topics),
             topics_posts: LookupMap::new(StorageKey::TopicsPosts),
@@ -100,7 +121,25 @@ impl Contract {
             members_in_communites: UnorderedMap::new(StorageKey::MemberInCommunites),
             storage_account_in_bytes: 0,
             admins: LookupSet::new(StorageKey::Admins),
+
+            place_ids: UnorderedSet::new(StorageKey::PlaceIds),
+            chests_per_place: LookupMap::new(StorageKey::ChestsPerPlace),
+            chests: LookupMap::new(StorageKey::Chests),
         };
+
+        let account_id = env::predecessor_account_id();
+
+        let topic_id = "default".to_string();
+
+        let topic = Topic {
+            id: topic_id.clone(),
+            name: "Default".to_string(),
+            admin: ValidAccountId::try_from(account_id).unwrap(),
+            created_time: env::block_timestamp().into(),
+            description: "Default topics for all post".to_string(),
+        };
+
+        this.topics.insert(&topic_id, &topic);
 
         this.measure_storage_account_in_bytes();
         this

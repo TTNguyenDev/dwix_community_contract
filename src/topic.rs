@@ -3,12 +3,12 @@ use super::*;
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
 pub struct Topic {
-    id: TopicId,
-    admin: ValidAccountId,
+    pub id: TopicId,
+    pub admin: ValidAccountId,
     // thumbnail: String,
-    name: String,
-    created_time: U64,
-    description: String,
+    pub name: String,
+    pub created_time: U64,
+    pub description: String,
 }
 
 pub type TopicId = String;
@@ -22,7 +22,7 @@ impl Contract {
         // topic_thumbnail: String,
         topic_desc: String,
     ) -> bool {
-        let topic_id = topic_name.to_lowercase().replace(" ", "_");
+        let topic_id = topic_name.to_lowercase().replace(' ', "_");
 
         assert!(
             topic_name.len() <= MAX_TITLE_LENGTH,
@@ -36,10 +36,7 @@ impl Contract {
             MAX_BODY_LENGTH
         );
 
-        assert!(
-            !self.topics.get(&topic_id.clone()).is_some(),
-            "Topic already exists"
-        );
+        assert!(self.topics.get(&topic_id).is_none(), "Topic already exists");
 
         let account_id = env::predecessor_account_id();
         let storage_update = self.new_storage_update(account_id.clone());
@@ -47,15 +44,16 @@ impl Contract {
         let topic = Topic {
             id: topic_id.clone(),
             name: topic_name,
-            admin: ValidAccountId::try_from(account_id.to_string()).unwrap(),
+            admin: ValidAccountId::try_from(account_id).unwrap(),
             // thumbnail: topic_thumbnail,
             created_time: env::block_timestamp().into(),
             description: topic_desc,
         };
 
-        self.topics.insert(&topic_id.clone(), &topic);
+        self.topics.insert(&topic_id, &topic);
         self.finalize_storage_update(storage_update);
-        return true;
+
+        true
     }
 
     pub fn topics(&self) -> Vec<Topic> {

@@ -9,6 +9,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 near-sdk = "3.1.0"
+near-contract-standards = "4.0.0"
 regex = "1.5.4"
 url = { version = "2.2.2", features = ["serde"] }
 

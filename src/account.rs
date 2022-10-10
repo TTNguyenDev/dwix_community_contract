@@ -5,13 +5,17 @@ use near_sdk::collections::UnorderedSet;
 pub struct Account {
     pub following: UnorderedSet<AccountId>,
     pub followers: UnorderedSet<AccountId>,
+    pub chests: Vec<ChestId>,
+    pub bookmarks: Vec<PostId>,
     pub related_conversations: UnorderedSet<MessageId>,
     pub message_pub_key: String,
 
     /// Personal Information
     pub avatar: String,
     pub thumbnail: String,
+    pub display_name: String,
     pub bio: String,
+
     pub joined_communities: UnorderedSet<CommunityId>,
 }
 
@@ -45,6 +49,7 @@ pub struct AccountStats {
     pub avatar: String,
     pub thumbnail: String,
     pub bio: String,
+    pub display_name: String,
 }
 
 impl From<Account> for AccountStats {
@@ -58,6 +63,7 @@ impl From<Account> for AccountStats {
             avatar: account.avatar,
             thumbnail: account.thumbnail,
             bio: account.bio,
+            display_name: account.display_name,
         }
     }
 }
@@ -90,6 +96,7 @@ impl Contract {
             })
             .collect()
     }
+
     pub fn follow(&mut self, account_id: ValidAccountId) {
         let account_id = account_id.into();
         let from_account_id = env::predecessor_account_id();
@@ -116,7 +123,7 @@ impl Contract {
     }
 
     pub fn unfollow(&mut self, account_id: String) {
-        let account_id = account_id.into();
+        let account_id = account_id;
         let from_account_id = env::predecessor_account_id();
         assert_ne!(
             &account_id, &from_account_id,
@@ -171,6 +178,35 @@ impl Contract {
         self.finalize_storage_update(storage_update);
     }
 
+    pub fn update_profile(
+        &mut self,
+        display_name: Option<String>,
+        bio: Option<String>,
+        avatar: Option<String>,
+        thumbnail: Option<String>,
+    ) {
+        let account_id = env::predecessor_account_id();
+
+        let storage_update = self.new_storage_update(account_id.clone());
+        let mut account = self.internal_get_account(&account_id);
+        if let Some(display_name) = display_name {
+            account.display_name = display_name
+        }
+        if let Some(bio) = bio {
+            account.bio = bio
+        }
+        if let Some(avatar) = avatar {
+            account.avatar = avatar
+        }
+        if let Some(thumbnail) = thumbnail {
+            account.thumbnail = thumbnail
+        }
+
+        self.internal_set_account(&account_id, account);
+
+        self.finalize_storage_update(storage_update);
+    }
+
     pub fn set_pub_key(&mut self, pub_key: String) {
         let account_id = env::predecessor_account_id();
 
@@ -180,6 +216,51 @@ impl Contract {
         self.internal_set_account(&account_id, account);
 
         self.finalize_storage_update(storage_update);
+    }
+
+    pub fn add_bookmark(&mut self, post_id: PostId) {
+        let account_id = env::predecessor_account_id();
+
+        let storage_update = self.new_storage_update(account_id.clone());
+        let mut account = self.internal_get_account(&account_id);
+        account.bookmarks.push(post_id);
+        self.internal_set_account(&account_id, account);
+
+        self.finalize_storage_update(storage_update);
+    }
+
+    pub fn remove_bookmark(&mut self, post_id: PostId) {
+        let account_id = env::predecessor_account_id();
+
+        let storage_update = self.new_storage_update(account_id.clone());
+        let mut account = self.internal_get_account(&account_id);
+
+        let index = account
+            .bookmarks
+            .iter()
+            .position(|x| *x == post_id)
+            .expect("Bookmark not found");
+        account.bookmarks.remove(index);
+
+        self.internal_set_account(&account_id, account);
+
+        self.finalize_storage_update(storage_update);
+    }
+
+    pub fn get_bookmarks(
+        &self,
+        account_id: ValidAccountId,
+        from_index: u64,
+        limit: u64,
+    ) -> Vec<Post> {
+        let bookmarks = self.internal_get_account(account_id.as_ref()).bookmarks;
+        calculate_rev_limit(bookmarks.len() as u64, from_index, limit)
+            .map(|index| {
+                let post_id = bookmarks.get(index as usize).unwrap();
+                self.posts.get(&post_id).expect("Post not found").into()
+            })
+            .rev()
+            .collect()
     }
 
     pub fn top_users(&self) -> Vec<AccountStats> {
@@ -211,8 +292,20 @@ impl Contract {
         from_index: u64,
         limit: u64,
     ) -> Vec<(AccountId, AccountStats)> {
-        let account = self.internal_get_account(account_id.as_ref());
-        self.get_account_range(account.following.as_vector(), from_index, limit)
+        let account = self.internal_get_account_optional(account_id.as_ref());
+        if let Some(account) = account {
+            self.get_account_range(account.following.as_vector(), from_index, limit)
+        } else {
+            vec![]
+        }
+    }
+
+    pub fn get_chest_by_account(&self, account_id: ValidAccountId) -> Vec<Chest> {
+        self.internal_get_account(account_id.as_ref())
+            .chests
+            .iter()
+            .map(|chest_id| self.chests.get(chest_id).expect("Chest not found"))
+            .collect()
     }
 
     pub fn get_account(&self, account_id: ValidAccountId) -> Option<AccountStats> {

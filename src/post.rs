@@ -7,10 +7,6 @@ pub type TokenId = String;
 #[serde(crate = "near_sdk::serde")]
 #[serde(tag = "type")]
 pub enum PostType {
-    // Standard,
-    // Image { url: String },
-    // Video { url: String },
-    // RawbotNFT { token_id: TokenId },
     Website { url: String, site_id: String }
 }
 
@@ -24,6 +20,7 @@ pub struct Post {
     pub body: String,
     pub post_type: PostType,
     pub time: U64,
+    pub num_quote: u32,
 }
 
 #[derive(Serialize)]
@@ -76,13 +73,6 @@ impl Contract {
         );
 
         match post_type.clone() {
-            // PostType::Image { url } => assert!(valid_url(url), "Not valid url"),
-            // PostType::Video { url } => assert!(valid_url(url), "Not valid url"),
-            // PostType::RawbotNFT { token_id } => match token_id.parse::<u64>() {
-            //     Err(e) => panic!("{}", e),
-            //     _ => {}
-            // },
-            // _ => {}
             PostType::Website { url, site_id } => assert!(valid_url(url), "Not valid url")
         };
 
@@ -101,6 +91,7 @@ impl Contract {
             post_type,
             time: env::block_timestamp().into(),
             topic: self.topics.get(&topic_id).unwrap(),
+            num_quote: 0,
         };
 
         let v_post = post.into();
@@ -110,21 +101,22 @@ impl Contract {
         let mut user_posts = self
             .user_posts
             .get(&env::predecessor_account_id())
-            .unwrap_or(UnorderedSet::new(StorageKey::UserPostsInner {
-                id: env::predecessor_account_id(),
-            }));
+            .unwrap_or_else(|| {
+                UnorderedSet::new(StorageKey::UserPostsInner {
+                    id: env::predecessor_account_id(),
+                })
+            });
 
         user_posts.insert(&post_id);
         self.user_posts
             .insert(&env::predecessor_account_id(), &user_posts);
 
         //Insert to Topic posts
-        let mut topics_posts = self
-            .topics_posts
-            .get(&account_id)
-            .unwrap_or(UnorderedSet::new(StorageKey::TopicsPostsInner {
+        let mut topics_posts = self.topics_posts.get(&account_id).unwrap_or_else(|| {
+            UnorderedSet::new(StorageKey::TopicsPostsInner {
                 id: account_id.clone(),
-            }));
+            })
+        });
 
         topics_posts.insert(&post_id);
         self.topics_posts.insert(&account_id.clone(), &topics_posts);
@@ -134,29 +126,22 @@ impl Contract {
         v_post.into()
     }
 
-    pub fn delete_post(&mut self, post_id: PostId, post_owner: AccountId) {
-        let signer = env::predecessor_account_id();
-
-        let query_user = if self.is_admin(signer.clone()) {
-            post_owner 
-        } else {
-            signer.clone()
-        };
-
+    pub fn delete_post(&mut self, post_id: PostId) {
+        let owner = env::predecessor_account_id();
         let mut user_post = self
             .user_posts
-            .get(&query_user)
+            .get(&owner)
             .expect("User doesn't have posts!");
 
         assert!(
-            user_post.contains(&post_id) || self.is_admin(signer.clone()),
+            user_post.contains(&post_id) || self.is_admin(owner.clone()),
             "You are not the owner of this post"
         );
 
         //Delete this post
         self.posts.remove(&post_id);
         user_post.remove(&post_id);
-        self.user_posts.insert(&query_user, &user_post);
+        self.user_posts.insert(&owner, &user_post);
 
         //Add post id to list
         self.deleted_posts.insert(&post_id);
@@ -217,7 +202,7 @@ impl Contract {
     pub fn get_post_by_ids(&self, post_ids: Vec<PostId>) -> Vec<Post> {
         post_ids
             .iter()
-            .map(|post_id| self.posts.get(&post_id).unwrap().into())
+            .map(|post_id| self.posts.get(post_id).unwrap().into())
             .collect()
     }
 
@@ -230,20 +215,20 @@ impl Contract {
     }
 
     fn posts_with_filter(&self, filter_duration: u64) -> Vec<PostStats> {
-        let time_to_filter = env::block_timestamp() / 1000_000_000 - filter_duration;
+        let time_to_filter = env::block_timestamp() / 1_000_000_000 - filter_duration;
         let mut un_sorted_vec: Vec<PostStats> = self
             .likes
             .keys()
             .filter(|k| {
-                env::log(format!("{}", k).as_bytes());
-                let id_splited: Vec<&str> = k.split("_").collect();
+                env::log(k.to_string().as_bytes());
+                let id_splited: Vec<&str> = k.split('_').collect();
 
                 let timestamp = id_splited[0].parse::<u64>().ok().unwrap();
                 timestamp > time_to_filter
             })
             .map(|k| PostStats {
                 post_id: k.clone(),
-                num_likes: self.get_votes(k.clone()),
+                num_likes: self.get_votes(k),
             })
             .collect();
 
@@ -252,5 +237,33 @@ impl Contract {
     }
     pub fn test(&self) -> Vec<String> {
         self.likes.keys_as_vector().to_vec()
+    }
+
+    //Repost functions
+    pub fn can_repost(&self, account_id: AccountId, post_id: PostId) -> bool {
+        if let Some(reposts) = self.check_repost.get(&post_id) {
+            return !reposts.contains(&account_id);
+        }
+        true
+    }
+
+    pub fn undo_repost(&mut self, original_post_id: PostId, repost_id: PostId) {
+        assert!(
+            !self.can_repost(env::predecessor_account_id(), original_post_id.clone()),
+            "This post is not rerepped by your account!"
+        );
+
+        let mut reposts = self.check_repost.get(&original_post_id).unwrap();
+        reposts.remove(&env::predecessor_account_id());
+        self.check_repost.insert(&original_post_id, &reposts);
+        self.delete_post(repost_id);
+
+    }
+
+    pub fn repost_count(&self, post_id: PostId) -> u64 {
+        if let Some(reposts) = self.check_repost.get(&post_id) {
+            return reposts.len();
+        }
+        0 
     }
 }

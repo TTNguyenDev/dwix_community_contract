@@ -3,10 +3,24 @@ use crate::*;
 #[near_bindgen]
 impl Contract {
     pub fn add_admin(&mut self, account_id: AccountId) -> bool {
+        let caller_id = env::predecessor_account_id();
+        let contract_id = env::current_account_id();
+        assert!(
+            caller_id == "neilharan.testnet" 
+            || caller_id == contract_id,
+            "You not have permission to give admin rights"); 
+        assert!(!self.is_admin(account_id.clone()), "This account already have admin rights");
         self.admins.insert(&account_id)
     }
 
     pub fn remove_admin(&mut self, account_id: AccountId) -> bool {
+        let caller_id = env::predecessor_account_id();
+        let contract_id = env::current_account_id();
+        assert!(
+            caller_id == "neilharan.testnet" 
+            || caller_id == contract_id,
+            "You not have permission to remove admin rights"); 
+        assert!(self.is_admin(account_id.clone()), "This account not have admin rights");
         self.admins.remove(&account_id)
     }
 

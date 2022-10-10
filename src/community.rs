@@ -56,7 +56,7 @@ impl Contract {
         name: String,
         description: String,
     ) -> CommunityId {
-        let community_id = name.to_lowercase().replace(" ", "_");
+        let community_id = name.to_lowercase().replace(' ', "_");
 
         assert!(
             name.len() <= MAX_TITLE_LENGTH,
@@ -71,7 +71,7 @@ impl Contract {
         );
 
         assert!(
-            !self.communities.get(&community_id.clone()).is_some(),
+            self.communities.get(&community_id).is_none(),
             "Community already exists"
         );
 
@@ -86,8 +86,8 @@ impl Contract {
             id: community_id.clone(),
             name,
             admin: ValidAccountId::try_from(account_id.to_string()).unwrap(),
-            thumbnail: thumbnail.unwrap_or("".to_string()),
-            avatar: avatar.unwrap_or("".to_string()),
+            thumbnail: thumbnail.unwrap_or_else(|| "".to_string()),
+            avatar: avatar.unwrap_or_else(|| "".to_string()),
             // members: UnorderedSet::new(prefix),
             // thumbnail: topic_thumbnail,
             created_time: env::block_timestamp().into(),
@@ -98,8 +98,7 @@ impl Contract {
             id: community_id.clone(),
         });
         members.insert(&env::predecessor_account_id());
-        self.members_in_communites
-            .insert(&community_id.clone(), &members);
+        self.members_in_communites.insert(&community_id, &members);
 
         //add community Id
         let mut user: Account = self
@@ -178,8 +177,7 @@ impl Contract {
             .expect("User not found")
             .into();
         user.joined_communities.remove(&community_id);
-        self.accounts
-            .insert(&new_member.clone().into(), &user.into());
+        self.accounts.insert(&new_member.into(), &user.into());
 
         members.remove(&env::predecessor_account_id());
         self.members_in_communites.insert(&community_id, &members);
@@ -227,13 +225,6 @@ impl Contract {
         );
 
         match post_type.clone() {
-            // PostType::Image { url } => assert!(valid_url(url), "Not valid url"),
-            // PostType::Video { url } => assert!(valid_url(url), "Not valid url"),
-            // PostType::RawbotNFT { token_id } => match token_id.parse::<u64>() {
-            //     Err(e) => panic!("{}", e),
-            //     _ => {}
-            // },
-            // _ => {}
             PostType::Website { url, site_id } => assert!(valid_url(url), "Not valid url")
         };
 
@@ -257,15 +248,18 @@ impl Contract {
             post_type,
             time: env::block_timestamp().into(),
             topic: self.topics.get(&topic_id).unwrap(),
+            num_quote: 0,
         };
 
         let v_post = post.into();
         let mut posts = self
             .communities_posts
             .get(&community_id)
-            .unwrap_or(UnorderedMap::new(StorageKey::CommunitiesPostsInner {
-                id: community_id.clone() + &env::block_index().to_string(),
-            }));
+            .unwrap_or_else(|| {
+                UnorderedMap::new(StorageKey::CommunitiesPostsInner {
+                    id: community_id.clone() + &env::block_index().to_string(),
+                })
+            });
 
         posts.insert(&post_id, &v_post);
         self.communities_posts.insert(&community_id, &posts);
@@ -292,7 +286,9 @@ impl Contract {
         let post: Post = posts.get(&post_id).expect("Post not found").into();
 
         assert!(
-            owner == post.account_id || owner == community.admin.to_string() || self.is_admin(owner),
+            owner == post.account_id
+                || owner == community.admin.to_string()
+                || self.is_admin(owner),
             "You don't have permission to delete"
         );
 
@@ -346,9 +342,11 @@ impl Contract {
         let posts = self
             .communities_posts
             .get(&community_id)
-            .unwrap_or(UnorderedMap::new(StorageKey::CommunitiesPostsInner {
-                id: community_id.clone() + &env::block_index().to_string(),
-            }));
+            .unwrap_or_else(|| {
+                UnorderedMap::new(StorageKey::CommunitiesPostsInner {
+                    id: community_id.clone() + &env::block_index().to_string(),
+                })
+            });
 
         let keys = posts.keys_as_vector();
 
@@ -395,7 +393,7 @@ impl Contract {
             "You're not the admin of this community"
         );
 
-        let storage_update = self.new_storage_update(account_id.clone());
+        let storage_update = self.new_storage_update(account_id);
         community.thumbnail = thumbnail;
         self.communities.insert(&community_id, &community);
         self.finalize_storage_update(storage_update);
@@ -414,7 +412,7 @@ impl Contract {
             "You're not the admin of this community"
         );
 
-        let storage_update = self.new_storage_update(account_id.clone());
+        let storage_update = self.new_storage_update(account_id);
         community.avatar = avatar;
         self.communities.insert(&community_id, &community);
         self.finalize_storage_update(storage_update);
@@ -433,7 +431,7 @@ impl Contract {
             "You're not the admin of this community"
         );
 
-        let storage_update = self.new_storage_update(account_id.clone());
+        let storage_update = self.new_storage_update(account_id);
         community.description = description;
         self.communities.insert(&community_id, &community);
         self.finalize_storage_update(storage_update);

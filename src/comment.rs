@@ -69,11 +69,14 @@ impl Contract {
         self.comments.insert(&post_id, &comments);
 
         self.finalize_storage_update(storage_update);
-        comment.into()
+        comment
     }
 
     pub fn get_comments(&self, post_id: PostId, from_index: u64, limit: u64) -> Vec<Comment> {
-        let comments = self.comments.get(&post_id).unwrap_or(Vector::new(b"v"));
+        let comments = self
+            .comments
+            .get(&post_id)
+            .unwrap_or_else(|| Vector::new(b"v"));
 
         let from = if comments.len() > (limit + from_index) {
             comments.len() - limit - from_index

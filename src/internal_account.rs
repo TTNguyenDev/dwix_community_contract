@@ -31,23 +31,26 @@ impl Contract {
         let account = Account {
             following: UnorderedSet::new(following_key),
             followers: UnorderedSet::new(followers_key),
+            chests: Vec::new(),
             related_conversations: UnorderedSet::new(messages_key),
             message_pub_key: "".to_string(),
-            bio: "".to_string(),
             avatar: "".to_string(),
             thumbnail: "".to_string(),
+            bio: "".to_string(),
+            display_name: "".to_string(),
             joined_communities: UnorderedSet::new(joined_communites_key),
+            bookmarks: Vec::new(),
         };
         let v_account = account.into();
         assert!(
-            self.accounts.insert(&account_id, &v_account).is_none(),
+            self.accounts.insert(account_id, &v_account).is_none(),
             "Account already exists"
         );
         v_account.into()
     }
 
     pub(crate) fn internal_get_account_optional(&self, account_id: &AccountId) -> Option<Account> {
-        self.accounts.get(&account_id).map(|a| a.into())
+        self.accounts.get(account_id).map(|a| a.into())
     }
 
     pub(crate) fn internal_get_account(&self, account_id: &AccountId) -> Account {
